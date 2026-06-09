@@ -1,0 +1,77 @@
+# =============================================================================
+# Squid Proxy Configuration Template
+# ACLs are injected at runtime from environment variables by entrypoint.sh
+# =============================================================================
+
+# Squid runtime user (matches uid 10001 set in Dockerfile)
+cache_effective_user proxyuser
+cache_effective_group proxyuser
+
+# Logging to stdout/stderr (ECS-friendly)
+access_log stdio:/dev/stdout combined
+cache_log stdio:/dev/stderr
+cache_store_log none
+
+# No on-disk cache — run as a pure forwarding proxy
+cache deny all
+cache_mem 64 MB
+
+# PID file in the directory owned by proxyuser
+pid_filename /run/squid/squid.pid
+
+# Only listen on all interfaces on port 3128
+http_port 3128
+
+# ---------------------------------------------------------------------------
+# ACL definitions — populated at runtime from environment variables
+# ---------------------------------------------------------------------------
+
+# Source IPs allowed to use this proxy (ALLOWED_IPS env var, comma-separated)
+# e.g. ALLOWED_IPS=10.0.0.0/8,172.16.0.0/12
+#ALLOWED_IPS_ACL#
+
+# Destination domain allow-list (ALLOWED_DOMAINS env var, comma-separated)
+# e.g. ALLOWED_DOMAINS=.example.com,.amazonaws.com
+#ALLOWED_DOMAINS_ACL#
+
+# Destination URL regex allow-list (ALLOWED_URL_REGEX env var, space-separated)
+# e.g. ALLOWED_URL_REGEX=^https://api\.example\.com/
+#ALLOWED_URL_REGEX_ACL#
+
+# Destination domain deny-list (DENIED_DOMAINS env var, comma-separated)
+# e.g. DENIED_DOMAINS=.badsite.com,.malware.io
+#DENIED_DOMAINS_ACL#
+
+# ---------------------------------------------------------------------------
+# Access rules — order matters; first match wins
+# ---------------------------------------------------------------------------
+
+# Always allow localhost (for health checks)
+acl localhost src 127.0.0.1/32 ::1
+http_access allow localhost
+
+# Allow CONNECT (HTTPS tunnelling) only to allowed domains / URL patterns
+acl SSL_ports port 443
+acl CONNECT method CONNECT
+
+# Block denied domains first
+#DENIED_DOMAINS_DENY#
+
+# Allow requests that match an allowed source IP (if configured)
+#ALLOWED_IPS_ALLOW#
+
+# Allow requests that match allowed domains (if configured)
+#ALLOWED_DOMAINS_ALLOW#
+
+# Allow requests that match allowed URL regex patterns (if configured)
+#ALLOWED_URL_REGEX_ALLOW#
+
+# Deny everything else
+http_access deny all
+
+# ---------------------------------------------------------------------------
+# Miscellaneous hardening
+# ---------------------------------------------------------------------------
+forwarded_for delete
+via off
+request_header_access X-Forwarded-For deny all
