@@ -1,8 +1,11 @@
-FROM alpine:3.19
+FROM alpine:3.24.1
 
 # Install squid and bash (needed for entrypoint logic)
 RUN apk add --no-cache squid bash
-
+RUN apk update && \
+    apk add --no-cache --upgrade openssl libssl3 ca-certificates && \
+    rm -rf /var/cache/apk/*
+    
 # Create dedicated non-root group and user with uid/gid 10001
 RUN addgroup -g 10001 -S proxyuser \
     && adduser -u 10001 -S -G proxyuser -H -D proxyuser
